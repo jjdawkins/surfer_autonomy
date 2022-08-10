@@ -1,11 +1,12 @@
 import math
+from functools import partial
 import pluginlib
 import surfer_autonomy.autonomy
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Twist, Pose, PoseArray
+from geometry_msgs.msg import Twist, Pose, PoseArray,PoseWithCovarianceStamped
 from surfer_msgs.msg import Status
 from surfer_msgs.srv import SetBehavior, GetBehaviors
 #import tf2_py
@@ -21,6 +22,7 @@ class SurferAutonomy(Node):
     def __init__(self):
         super().__init__('autonomy_node')
         self.status = Status()
+        self.prev_status = Status()
         # Declare Parameters for Autonomy Make sure Parameters for your plugins are properly defined
         # Todo provide away for the user to set the parameters from interface
 
@@ -33,13 +35,15 @@ class SurferAutonomy(Node):
         #print(self.get_parameter('waypoint/radius').get_parameter_value().double_value())
         self.plugin_list = self.load_plugins(self.behaviors)
 
-        print(self.plugin_list)
+        
+        self.group_names = []
         #self.plugin = self.plugin_list.autonomy_plugin.waypoint()
 
         self.timer_period = self.get_parameter('loop_period').get_parameter_value().double_value  # seconds
         self.i = 0
 
-        self.subscription = self.create_subscription(Status,'status',self.status_cb,10)
+        self.status_sub = self.create_subscription(Status,'status',self.status_cb,10)
+        self.globe_status_sub = self.create_subscription(Status,'/global_status',self.global_status_cb,10)
 
 
         self.des_pose = Pose()
@@ -47,6 +51,19 @@ class SurferAutonomy(Node):
         #self.plugin.init(params)
         self.timer = self.create_timer(self.timer_period, self.timer_cb)
 
+
+    def status_cb(self,msg):
+        self.status = msg
+        
+        
+        
+
+
+    def global_status_cb(self,msg):
+        if(msg.group == self.status.group):
+            if(msg.name not in self.group_names):
+                self.group_names.append(msg.name)
+        
 
     def load_plugins(self,behaviors):
         #loader = pluginlib.PluginLoader(paths=['.'])
@@ -63,11 +80,7 @@ class SurferAutonomy(Node):
         #module = plugins.autonomy_plugin.waypoint()
         return plugins
 
-    def status_cb(self,msg):
-        if(msg.behavior != self.status.behavior):
-            self.change_plugin(msg.behavior)
 
-        self.status = msg
 
     def change_plugin(self,plugin_name):
 
@@ -75,31 +88,50 @@ class SurferAutonomy(Node):
         # current behavior plugin
         try:
             self.plugin.stop()
+          #  self.timer.destroy()
         except:
             self.get_logger().warning("No plugin is currently loaded none to stop")
         # Load new plugin object based on name from behavior status change
+        print(plugin_name)
+
         self.plugin = self.plugin_list.autonomy_plugin[plugin_name]()
-        self.get_logger().info("loading plugin %s " % plugin_name)
+        #self.get_logger().info("loading plugin %s " % plugin_name)
         self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', 10)
         self.odom_sub = self.create_subscription(Odometry,'odom',self.plugin.odom_cb,1)
         self.wp_sub = self.create_subscription(Pose,'waypoint',self.plugin.wp_cb,1)
         self.path_sub = self.create_subscription(PoseArray,'path',self.plugin.path_cb,1)
+        k = 0
+        self.subs = []
+        for name in self.group_names:
+            sub = self.create_subscription(PoseWithCovarianceStamped,'/'+name+'/pose',partial(self.plugin.poses_cb,name),1)
+            self.subs.append(sub) 
+            k+=1
+
         self.plugin.set_publisher(self.cmd_vel_pub)
+        self.plugin.set_status(self.status)
         self.plugin.init(self.params)
 
+
     def timer_cb(self):
-        msg = Twist()
+
+        if(self.status.behavior != self.prev_status.behavior):
+            self.change_plugin(self.status.behavior)
+           # self.timer = self.create_timer(self.timer_period, self.timer_cb)
+
+        
         if(self.status.mode == 'AUTO'):
-            try:
+            #try:
                 self.plugin.run()
-            except:
-                self.get_logger().error("Plugin Not Yet Selected")
+            #except:
+            #    self.get_logger().error("Plugin Not Yet Selected")
+        
+        self.prev_status = self.status
 
 def main(args=None):
     rclpy.init(args=args)
     sa = SurferAutonomy()
     rclpy.spin(sa)
-    ba.destroy_node()
+    sa.destroy_node()
     rclpy.shutdown()
 
 

@@ -81,7 +81,6 @@ class BasicAutonomy(Node):
         msg = Twist()
 
 
-
     def timer_callback(self):
         msg = Twist()
         if(self.status.armed):

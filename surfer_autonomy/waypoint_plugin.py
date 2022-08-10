@@ -19,6 +19,7 @@ class WaypointPlugin(auto.AutonomyPlugin):
 
     def run(self):
 
+        #print(self.poses)
         if(self.wp_received):
             msg = Twist()
 
@@ -46,4 +47,4 @@ class WaypointPlugin(auto.AutonomyPlugin):
         msg = Twist()
         self.cmd_vel_pub.publish(msg)
         self.des_pose = []
-        print(stop)
+        print("stop")

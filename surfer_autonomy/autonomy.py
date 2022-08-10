@@ -5,6 +5,7 @@ import numpy as np
 import quaternion
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist, Pose, PoseArray
+from surfer_msgs.msg import Status
 
 
 @pluginlib.Parent('autonomy_plugin')
@@ -22,6 +23,11 @@ class AutonomyPlugin(object):
         self.path_received = False
         self.path = []
         self.params = []
+        self.name = ''
+        self.group = ''
+        self.type = ''
+        self.poses = {}
+        
 
     @pluginlib.abstractmethod
     def init(self,params):
@@ -36,6 +42,12 @@ class AutonomyPlugin(object):
     def stop(self,string):
         self.stop = 0
 
+    def set_status(self,status):
+        print("my_status ",status)
+        self.name = status.name
+        self.group = status.group
+        self.type = status.type
+
     def set_publisher(self,pub):
         self.cmd_vel_pub = pub
 
@@ -45,7 +57,17 @@ class AutonomyPlugin(object):
 
     def path_cb(self,msg):
         self.path = msg
-        self.path_received = True
+        self.path_received = True   
+
+    def poses_cb(self,caller,msg):
+        pose = np.zeros(6)
+        pose[0:3] = np.array([msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z])
+        quat = np.array([msg.pose.pose.orientation.w, msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z])
+
+        pose[3:7] = euler.quat2euler(quat)
+
+        self.poses[caller]=pose
+
 
     def odom_cb(self,msg):
         self.pos = np.array([msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z])
