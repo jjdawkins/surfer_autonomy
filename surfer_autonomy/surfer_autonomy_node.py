@@ -26,16 +26,21 @@ class SurferAutonomy(Node):
         # Declare Parameters for Autonomy Make sure Parameters for your plugins are properly defined
         # Todo provide away for the user to set the parameters from interface
 
-        self.declare_parameter('behaviors')
+        self.declare_parameter('behaviors',[''])
         self.declare_parameter('loop_period',0.5)
-        self.declare_parameter('radius')
-        self.declare_parameter('speed')
-        self.declare_parameter('loop')
+        self.declare_parameter('radius',1.0)
+        self.declare_parameter('speed',1.0)
+        self.declare_parameter('loop',False)
+        self.declare_parameter('prefix','/consensus')
         self.behaviors = self.get_parameter('behaviors').get_parameter_value().string_array_value
+
+
+        self.pose_prefix = self.get_parameter('prefix').get_parameter_value().string_value
+        print(self.pose_prefix)
         #print(self.get_parameter('waypoint/radius').get_parameter_value().double_value())
         self.plugin_list = self.load_plugins(self.behaviors)
 
-        
+
         self.group_names = []
         #self.plugin = self.plugin_list.autonomy_plugin.waypoint()
 
@@ -54,16 +59,13 @@ class SurferAutonomy(Node):
 
     def status_cb(self,msg):
         self.status = msg
-        
-        
-        
 
 
     def global_status_cb(self,msg):
         if(msg.group == self.status.group):
             if(msg.name not in self.group_names):
                 self.group_names.append(msg.name)
-        
+
 
     def load_plugins(self,behaviors):
         #loader = pluginlib.PluginLoader(paths=['.'])
@@ -103,8 +105,8 @@ class SurferAutonomy(Node):
         k = 0
         self.subs = []
         for name in self.group_names:
-            sub = self.create_subscription(PoseWithCovarianceStamped,'/'+name+'/pose',partial(self.plugin.poses_cb,name),1)
-            self.subs.append(sub) 
+            sub = self.create_subscription(PoseWithCovarianceStamped,self.pose_prefix+'/'+name+'/pose',partial(self.plugin.poses_cb,name),1)
+            self.subs.append(sub)
             k+=1
 
         self.plugin.set_publisher(self.cmd_vel_pub)
@@ -118,13 +120,13 @@ class SurferAutonomy(Node):
             self.change_plugin(self.status.behavior)
            # self.timer = self.create_timer(self.timer_period, self.timer_cb)
 
-        
+
         if(self.status.mode == 'AUTO'):
             #try:
                 self.plugin.run()
             #except:
             #    self.get_logger().error("Plugin Not Yet Selected")
-        
+
         self.prev_status = self.status
 
 def main(args=None):
