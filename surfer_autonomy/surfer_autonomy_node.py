@@ -31,7 +31,7 @@ class SurferAutonomy(Node):
         self.declare_parameter('radius',1.0)
         self.declare_parameter('speed',1.0)
         self.declare_parameter('loop',False)
-        self.declare_parameter('prefix','/consensus')
+        self.declare_parameter('prefix','')
         self.behaviors = self.get_parameter('behaviors').get_parameter_value().string_array_value
 
 

@@ -1,5 +1,6 @@
 import pluginlib
 import rclpy
+import time
 from transforms3d import euler
 import numpy as np
 import quaternion
@@ -27,6 +28,11 @@ class AutonomyPlugin(object):
         self.group = ''
         self.type = ''
         self.poses = {}
+        self.old_poses = {}
+        self.velocities = {}
+        self.timer_array= {}
+        self.dts = {}
+        self.caller_list=[]
         
 
     @pluginlib.abstractmethod
@@ -63,11 +69,21 @@ class AutonomyPlugin(object):
         pose = np.zeros(6)
         pose[0:3] = np.array([msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z])
         quat = np.array([msg.pose.pose.orientation.w, msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z])
-
+        vel = np.zeros(3)
         pose[3:7] = euler.quat2euler(quat)
+        if(caller in self.caller_list):
+            if(self.timer_array[caller]):
+                dt = time.time() - self.timer_array[caller]
+                old_vel = self.old_poses[caller]
+                vel = (pose[0:3] - old_vel[0:3])/dt
+        else:
+            self.caller_list.append(caller)
 
-        self.poses[caller]=pose
 
+        self.poses[caller]= pose
+        self.timer_array[caller] = time.time()
+        self.velocities[caller] = vel
+        self.old_poses = self.poses
 
     def odom_cb(self,msg):
         self.pos = np.array([msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z])
